@@ -87,16 +87,16 @@ def preprocess_and_save_data(text, token_lookup, create_lookup_tables):
     vocab_to_int, int_to_vocab = create_lookup_tables(text)
     int_text = [vocab_to_int[word] for word in text]
 
-    pickle.dump((int_text, vocab_to_int, int_to_vocab, token_dict), open('preprocess.p', 'wb'))
+    pickle.dump((int_text, vocab_to_int, int_to_vocab, token_dict), open('./data/preprocess.p', 'wb'))
 
 
 def load_preprocess():
-    return pickle.load(open('preprocess.p', mode='rb'))
+    return pickle.load(open('./data/preprocess.p', mode='rb'))
 
 
 def save_params(params):
-    pickle.dump(params, open('params.p', 'wb'))
+    pickle.dump(params, open('./data/params.p', 'wb'))
 
 
 def load_params():
-    return pickle.load(open('params.p', mode='rb'))
+    return pickle.load(open('./data/params.p', mode='rb'))

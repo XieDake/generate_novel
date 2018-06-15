@@ -1,30 +1,21 @@
-import dataPreProcess
-
-text = dataPreProcess.load_text('./data/寒门首辅.txt')
-lines_of_text = dataPreProcess.two_otherNoUseContent(dataPreProcess.first_spaceAndEnter(text))
-
-dataPreProcess.preprocess_and_save_data(''.join(lines_of_text), dataPreProcess.token_lookup, dataPreProcess.create_lookup_tables)
-int_text, vocab_to_int, int_to_vocab, token_dict = dataPreProcess.load_preprocess()
-
+from tensorflow.contrib import seq2seq
 import tensorflow as tf
 import numpy as np
+import os
 
-num_epochs = 200
-# batch大小
-batch_size = 128
-# lstm层中包含的unit个数
-rnn_size = 256
-# embedding layer的大小
-embed_dim = 300
-# 训练步长
-seq_length = 32
-# 学习率
-learning_rate = 0.01
-# 每多少步打印一次训练信息
-show_every_n_batches = 8
-# 保存session状态的位置
-# save_dir = './checkpoints/save'
-save_dir = './save'
+import dataPreProcess
+
+tf.app.flags.DEFINE_integer('batch_size', 128, 'batch size.')
+tf.app.flags.DEFINE_integer('num_epochs', 200, 'train how many epochs.')
+tf.app.flags.DEFINE_integer('rnn_size', 256, 'number units in rnn cell.')
+tf.app.flags.DEFINE_float('learning_rate', 0.01, 'learning rate.')
+tf.app.flags.DEFINE_integer('embed_dim', 300, 'embedding layer的大小')
+tf.app.flags.DEFINE_integer('show_every_n_batches', 8, '每多少步打印一次训练信息')
+# set this to 'main.py' relative path
+tf.app.flags.DEFINE_string('save_dir', os.path.abspath('./checkpoints/save'), 'checkpoints save path.')
+tf.app.flags.DEFINE_string('file_path', os.path.abspath('./data/寒门首辅.txt'), 'file name of poems.')
+
+FLAGS = tf.app.flags.FLAGS
 
 def get_inputs():
     # inputs和targets的类型都是整数的
@@ -134,68 +125,82 @@ def get_batches(int_text, batch_size, seq_length):
     return batches
 
 
-from tensorflow.contrib import seq2seq
+def train():
 
-train_graph = tf.Graph()
-with train_graph.as_default():
-    # 文字总量
-    vocab_size = len(int_to_vocab)
+    text = dataPreProcess.load_text(FLAGS.file_path)
+    lines_of_text = dataPreProcess.two_otherNoUseContent(dataPreProcess.first_spaceAndEnter(text))
 
-    # 获取模型的输入，目标以及学习率节点，这些都是tf的placeholder
-    input_text, targets, lr = get_inputs()
+    dataPreProcess.preprocess_and_save_data(''.join(lines_of_text), dataPreProcess.token_lookup,
+                                            dataPreProcess.create_lookup_tables)
+    int_text, vocab_to_int, int_to_vocab, token_dict = dataPreProcess.load_preprocess()
 
-    # 输入数据的shape
-    input_data_shape = tf.shape(input_text)
+    train_graph = tf.Graph()
+    with train_graph.as_default():
+        # 文字总量
+        vocab_size = len(int_to_vocab)
 
-    # 创建rnn的cell和初始状态节点，rnn的cell已经包含了lstm，dropout
-    # 这里的rnn_size表示每个lstm cell中包含了多少的神经元
-    cell, initial_state = get_init_cell(input_data_shape[0], rnn_size)
-    # 创建计算loss和finalstate的节点
-    logits, final_state = build_nn(cell, rnn_size, input_text, vocab_size, embed_dim)
+        # 获取模型的输入，目标以及学习率节点，这些都是tf的placeholder
+        input_text, targets, lr = get_inputs()
 
-    # 使用softmax计算最后的预测概率
-    probs = tf.nn.softmax(logits, name='probs')
+        # 输入数据的shape
+        input_data_shape = tf.shape(input_text)
 
-    # 计算loss
-    cost = seq2seq.sequence_loss(logits,targets,tf.ones([input_data_shape[0], input_data_shape[1]]))
+        # 创建rnn的cell和初始状态节点，rnn的cell已经包含了lstm，dropout
+        # 这里的rnn_size表示每个lstm cell中包含了多少的神经元
+        cell, initial_state = get_init_cell(input_data_shape[0], FLAGS.rnn_size)
+        # 创建计算loss和finalstate的节点
+        logits, final_state = build_nn(cell, FLAGS.rnn_size, input_text, vocab_size, FLAGS.embed_dim)
 
-    # 使用Adam提督下降
-    optimizer = tf.train.AdamOptimizer(lr)
+        # 使用softmax计算最后的预测概率
+        probs = tf.nn.softmax(logits, name='probs')
 
-    # 裁剪一下Gradient输出，最后的gradient都在[-1, 1]的范围内
-    gradients = optimizer.compute_gradients(cost)
-    capped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients if grad is not None]
-    train_op = optimizer.apply_gradients(capped_gradients)
+        # 计算loss
+        cost = seq2seq.sequence_loss(logits,targets,tf.ones([input_data_shape[0], input_data_shape[1]]))
 
-# 获得训练用的所有batch
-batches = get_batches(int_text, batch_size, seq_length)
+        # 使用Adam提督下降
+        optimizer = tf.train.AdamOptimizer(lr)
 
-# 打开session开始训练，将上面创建的graph对象传递给session
-with tf.Session(graph=train_graph) as sess:
-    sess.run(tf.global_variables_initializer())
+        # 裁剪一下Gradient输出，最后的gradient都在[-1, 1]的范围内
+        gradients = optimizer.compute_gradients(cost)
+        capped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients if grad is not None]
+        train_op = optimizer.apply_gradients(capped_gradients)
 
-    for epoch_i in range(num_epochs):
-        state = sess.run(initial_state, {input_text: batches[0][0]})
+    # 获得训练用的所有batch
+    batches = get_batches(int_text, FLAGS.batch_size, FLAGS.seq_length)
 
-        for batch_i, (x, y) in enumerate(batches):
-            feed = {
-                input_text: x,
-                targets: y,
-                initial_state: state,
-                lr: learning_rate}
-            train_loss, state, _ = sess.run([cost, final_state, train_op], feed)
+    # 打开session开始训练，将上面创建的graph对象传递给session
+    with tf.Session(graph=train_graph) as sess:
+        sess.run(tf.global_variables_initializer())
 
-            # 打印训练信息
-            if (epoch_i * len(batches) + batch_i) % show_every_n_batches == 0:
-                print('Epoch {:>3} Batch {:>4}/{}   train_loss = {:.3f}'.format(
-                    epoch_i,
-                    batch_i,
-                    len(batches),
-                    train_loss))
+        for epoch_i in range(FLAGS.num_epochs):
+            state = sess.run(initial_state, {input_text: batches[0][0]})
 
-                # 保存模型
-    saver = tf.train.Saver()
-    saver.save(sess, save_dir)
-    print('Model Trained and Saved')
+            for batch_i, (x, y) in enumerate(batches):
+                feed = {
+                    input_text: x,
+                    targets: y,
+                    initial_state: state,
+                    lr: FLAGS.learning_rate}
+                train_loss, state, _ = sess.run([cost, final_state, train_op], feed)
 
-dataPreProcess.save_params((seq_length, save_dir))
+                # 打印训练信息
+                if (epoch_i * len(batches) + batch_i) % FLAGS.show_every_n_batches == 0:
+                    print('Epoch {:>3} Batch {:>4}/{}   train_loss = {:.3f}'.format(
+                        epoch_i,
+                        batch_i,
+                        len(batches),
+                        train_loss))
+
+                    # 保存模型
+        saver = tf.train.Saver()
+        saver.save(sess, FLAGS.save_dir)
+        print('Model Trained and Saved')
+
+    dataPreProcess.save_params((FLAGS.seq_length, FLAGS.save_dir))
+
+def main():
+    train()
+
+if __name__ == '__main__':
+    tf.app.run()
+
