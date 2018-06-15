@@ -10,6 +10,23 @@ def load_text(path):
 
     return text_data
 
+def load_jinyongData():
+    text = ''
+    for dirname in os.listdir('./data/jinyong'):
+        if os.path.isdir(os.path.join('./data/jinyong',dirname)):
+            for filename in os.listdir(os.path.join('./data/jinyong',dirname)):
+                if filename.endswith('txt'):
+                    text_temp = []
+                    with open(os.path.join('./data/jinyong/' + dirname, filename), 'rb') as f:
+                        text_data = f.read()
+                    text_data = text_data.decode("gbk")
+                    text_temp = text_data.split('\r\n')
+                    text_temp[:4] = ''
+                    text = text + ''.join(text_temp)
+
+
+    return text
+
 # 第一层处理：去掉空格和换行符
 def first_spaceAndEnter(text):
     num_words_for_training = 100000
@@ -57,6 +74,17 @@ def two_otherNoUseContent(lines_of_text):
     # print(lines_of_text[-20:])
     return lines_of_text
 
+def jinyong_first_spaceAndEnter(text):
+
+    # print(text)
+    lines_of_text = text.split('\u3000\u3000')
+    # lines_of_text = lines_of_text[14:]
+    # print(lines_of_text)
+    lines_of_text = [lines for lines in lines_of_text if len(lines) > 0]
+    lines_of_text = [lines.strip() for lines in lines_of_text]
+    # print(lines_of_text)
+    return lines_of_text
+
 # 文字 《==》 数字
 def create_lookup_tables(input_data):
     vocab = set(input_data)
@@ -87,16 +115,20 @@ def preprocess_and_save_data(text, token_lookup, create_lookup_tables):
     vocab_to_int, int_to_vocab = create_lookup_tables(text)
     int_text = [vocab_to_int[word] for word in text]
 
-    pickle.dump((int_text, vocab_to_int, int_to_vocab, token_dict), open('./data/preprocess.p', 'wb'))
+    pickle.dump((int_text, vocab_to_int, int_to_vocab, token_dict), open('./data/jinyong/preprocess.p', 'wb'))
+    # pickle.dump((int_text, vocab_to_int, int_to_vocab, token_dict), open('./data/preprocess.p', 'wb'))
 
 
 def load_preprocess():
-    return pickle.load(open('./data/preprocess.p', mode='rb'))
+    return pickle.load(open('./data/jinyong/preprocess.p', mode='rb'))
+    # return pickle.load(open('./data/preprocess.p', mode='rb'))
 
 
 def save_params(params):
-    pickle.dump(params, open('./data/params.p', 'wb'))
+    pickle.dump(params, open('./data/jinyong/params.p', 'wb'))
+    # pickle.dump(params, open('./data/params.p', 'wb'))
 
 
 def load_params():
-    return pickle.load(open('./data/params.p', mode='rb'))
+    # return pickle.load(open('./data/params.p', mode='rb'))
+    return pickle.load(open('./data/jinyong/params.p', mode='rb'))

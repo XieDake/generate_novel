@@ -6,13 +6,17 @@ import os
 import dataPreProcess
 
 tf.app.flags.DEFINE_integer('batch_size', 128, 'batch size.')
+tf.app.flags.DEFINE_integer('seq_length', 32, 'the sequence length.')
 tf.app.flags.DEFINE_integer('num_epochs', 200, 'train how many epochs.')
 tf.app.flags.DEFINE_integer('rnn_size', 256, 'number units in rnn cell.')
 tf.app.flags.DEFINE_float('learning_rate', 0.01, 'learning rate.')
 tf.app.flags.DEFINE_integer('embed_dim', 300, 'embedding layer的大小')
 tf.app.flags.DEFINE_integer('show_every_n_batches', 8, '每多少步打印一次训练信息')
 # set this to 'main.py' relative path
-tf.app.flags.DEFINE_string('save_dir', os.path.abspath('./checkpoints/save'), 'checkpoints save path.')
+# tf.app.flags.DEFINE_string('save_dir', os.path.abspath('./checkpoints/save'), 'checkpoints save path.')
+# tf.app.flags.DEFINE_string('file_path', os.path.abspath('./data/寒门首辅.txt'), 'file name of poems.')
+
+tf.app.flags.DEFINE_string('save_dir', os.path.abspath('./checkpoints/jinyong/save'), 'checkpoints save path.')
 tf.app.flags.DEFINE_string('file_path', os.path.abspath('./data/寒门首辅.txt'), 'file name of poems.')
 
 FLAGS = tf.app.flags.FLAGS
@@ -127,8 +131,10 @@ def get_batches(int_text, batch_size, seq_length):
 
 def train():
 
-    text = dataPreProcess.load_text(FLAGS.file_path)
-    lines_of_text = dataPreProcess.two_otherNoUseContent(dataPreProcess.first_spaceAndEnter(text))
+    # text = dataPreProcess.load_text(FLAGS.file_path)
+    text = dataPreProcess.load_jinyongData()
+    # lines_of_text = dataPreProcess.two_otherNoUseContent(dataPreProcess.first_spaceAndEnter(text))
+    lines_of_text = dataPreProcess.two_otherNoUseContent(text)
 
     dataPreProcess.preprocess_and_save_data(''.join(lines_of_text), dataPreProcess.token_lookup,
                                             dataPreProcess.create_lookup_tables)
@@ -198,9 +204,10 @@ def train():
 
     dataPreProcess.save_params((FLAGS.seq_length, FLAGS.save_dir))
 
-def main():
-    train()
+# def main():
+#     train()
 
-if __name__ == '__main__':
-    tf.app.run()
+# if __name__ == '__main__':
+#     tf.app.run()
 
+train()
